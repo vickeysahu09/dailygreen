@@ -1,89 +1,45 @@
 import jsonfile from "jsonfile";
 import moment from "moment";
-import simpleGit from "simple-git";
+import readline from "readline/promises";
+import { stdin as input, stdout as output } from "process";
 
 const path = "./data.json";
-const git = simpleGit();
 
-const START_DATE = "2026-07-01";
-const END_DATE = "2026-09-07";
+const rl = readline.createInterface({ input, output });
 
-async function makeDailyCommits() {
-  let date = moment(START_DATE).startOf("day");
-  const endDate = moment(END_DATE).startOf("day");
-
-  console.log("🚀 Starting daily commits...");
-  console.log(`📅 From: ${START_DATE}`);
-  console.log(`📅 To:   ${END_DATE}`);
-
-  while (date.isSameOrBefore(endDate, "day")) {
-
-    // Different time for each commit
-    const commitDate = date.clone().set({
-      hour: 10,
-      minute: 30,
-      second: 0
-    });
-
-    const formattedDate = commitDate.format();
-
-    console.log(
-      `\n📝 Creating commit for ${date.format("DD MMM YYYY")}`
-    );
-
-    // Data to write
-    const data = {
-      date: formattedDate,
-      message: `Daily activity - ${date.format("DD MMM YYYY")}`
-    };
-
+async function addActivity() {
     try {
-      // Update data.json
-      await jsonfile.writeFile(path, data, {
-        spaces: 2
-      });
+        const description = await rl.question(
+            "Enter today's project activity: "
+        );
 
-      // Set Git author and committer dates
-      process.env.GIT_AUTHOR_DATE = formattedDate;
-      process.env.GIT_COMMITTER_DATE = formattedDate;
-
-      // Stage file
-      await git.add(path);
-
-      // Create commit
-      await git.commit(
-        `Daily commit - ${date.format("DD MMM YYYY")}`,
-        {
-          "--date": formattedDate
+        if (!description.trim()) {
+            console.log("Activity cannot be empty.");
+            return;
         }
-      );
 
-      console.log(
-        `✅ Commit created: ${date.format("DD MMM YYYY")}`
-      );
+        const activities = await jsonfile.readFile(path).catch(() => []);
+
+        const activity = {
+            date: moment().format("YYYY-MM-DD"),
+            time: moment().format("HH:mm:ss"),
+            description: description.trim()
+        };
+
+        activities.push(activity);
+
+        await jsonfile.writeFile(path, activities, {
+            spaces: 2
+        });
+
+        console.log("\nActivity saved successfully!");
+        console.log(activity);
 
     } catch (error) {
-      console.error(
-        `❌ Error on ${date.format("DD MMM YYYY")}:`,
-        error.message
-      );
+        console.error("Error:", error.message);
+    } finally {
+        rl.close();
     }
-
-    // Move to next day
-    date.add(1, "day");
-  }
-
-  console.log("\n🎉 All daily commits created!");
-
-  try {
-    await git.push("origin", "main");
-    console.log("🚀 Successfully pushed to GitHub!");
-  } catch (error) {
-    console.error("❌ Push failed:", error.message);
-    console.log(
-      "Try: git push -u origin main --force"
-    );
-  }
 }
 
-makeDailyCommits();
+addActivity();
